@@ -1,22 +1,14 @@
 const http = require('http');
+const https = require('https');
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
+const AdmZip = require('adm-zip');
 
 const XRAY_URL = 'https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip';
 const dir = __dirname;
 const xrayBin = path.join(dir, 'xray');
-
-function ensureXray() {
-  if (fs.existsSync(xrayBin)) return;
-  console.log('downloading xray...');
-  execSync(`curl -fsSL -o xray.zip ${XRAY_URL} && unzip -o xray.zip xray && chmod +x xray && rm -f xray.zip`, { cwd: dir, stdio: 'inherit' });
-}
-
-ensureXray();
-const child = spawn(xrayBin, ['run', '-c', path.join(dir, 'config.json')], { cwd: dir, stdio: 'inherit' });
-child.on('exit', (code) => { console.error('xray exited', code); process.exit(code || 1); });
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -39,3 +31,43 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(3000, () => console.log('listening on 3000'));
+
+function download(url, dest, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirects > 5) return reject(new Error('too many redirects'));
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return resolve(download(res.headers.location, dest, redirects + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+      const out = fs.createWriteStream(dest);
+      res.pipe(out);
+      out.on('finish', () => out.close(resolve));
+      out.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+async function startXray() {
+  try {
+    if (!fs.existsSync(xrayBin)) {
+      console.log('downloading xray...');
+      const zipPath = path.join(dir, 'xray.zip');
+      await download(XRAY_URL, zipPath);
+      console.log('download done, extracting...');
+      const zip = new AdmZip(zipPath);
+      zip.extractEntryTo('xray', dir, false, true);
+      fs.chmodSync(xrayBin, 0o755);
+      fs.unlinkSync(zipPath);
+      console.log('xray extracted');
+    }
+    const child = spawn(xrayBin, ['run', '-c', path.join(dir, 'config.json')], { cwd: dir, stdio: 'inherit' });
+    child.on('exit', (code) => { console.error('xray exited', code); });
+    console.log('xray started');
+  } catch (e) {
+    console.error('xray setup failed:', e && e.message ? e.message : e);
+  }
+}
+
+startXray();
