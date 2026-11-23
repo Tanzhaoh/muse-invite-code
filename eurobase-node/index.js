@@ -6,9 +6,11 @@ const path = require('path');
 const { spawn } = require('child_process');
 const AdmZip = require('adm-zip');
 
+const os = require('os');
 const XRAY_URL = 'https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip';
 const dir = __dirname;
-const xrayBin = path.join(dir, 'xray');
+const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xray-'));
+const xrayBin = path.join(workDir, 'xray');
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -54,11 +56,11 @@ async function startXray() {
   try {
     if (!fs.existsSync(xrayBin)) {
       console.log('downloading xray...');
-      const zipPath = path.join(dir, 'xray.zip');
+      const zipPath = path.join(workDir, 'xray.zip');
       await download(XRAY_URL, zipPath);
       console.log('download done, extracting...');
       const zip = new AdmZip(zipPath);
-      zip.extractEntryTo('xray', dir, false, true);
+      zip.extractEntryTo('xray', workDir, false, true);
       fs.chmodSync(xrayBin, 0o755);
       fs.unlinkSync(zipPath);
       console.log('xray extracted');
