@@ -3,6 +3,6 @@
   "version": "1.0.1",
   "private": true,
   "engines": { "node": ">=18" },
-  "scripts": { "start": "node index.js" },
+  "scripts": { "start": "node index.js", "postinstall": "node install-xray.js" },
   "dependencies": { "adm-zip": "^0.5.16" }
 }

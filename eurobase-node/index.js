@@ -52,6 +52,18 @@ function download(url, dest, redirects = 0) {
 }
 
 async function startXray() {
+  const prebuilt = path.join(dir, 'xray-bin', 'xray');
+  try {
+    execFileSync(prebuilt, ['version'], { timeout: 10000 });
+    console.log('xray exec ok (prebuilt)');
+    const child = spawn(prebuilt, ['run', '-c', path.join(dir, 'config.json')], { cwd: dir, stdio: 'inherit' });
+    child.on('error', (err) => { console.error('xray spawn error:', err.message); });
+    child.on('exit', (code) => { console.error('xray exited', code); });
+    console.log('xray started');
+    return;
+  } catch (e) {
+    console.error('prebuilt xray failed:', e && e.message ? e.message : e);
+  }
   const candidates = [process.cwd(), os.homedir(), os.tmpdir(), dir];
   for (const base of candidates) {
     try {
