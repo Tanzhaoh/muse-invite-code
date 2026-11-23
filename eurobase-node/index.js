@@ -30,7 +30,8 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => upstream.destroy());
 });
 
-server.listen(3000, () => console.log('listening on 3000'));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => console.log('listening on 0.0.0.0:' + PORT));
 
 function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
